@@ -28,7 +28,7 @@ cp .env.example .env
 # Generate application key
 php artisan key:generate
 
-# Run database migrations or import database in folder /database
+# Run database migrations or import database in folder /database/db.sql
 php artisan migrate
 
 # Install frontend dependencies
