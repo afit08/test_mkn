@@ -14,8 +14,8 @@ class ProductController extends Controller
             // Get query parameters
             $search = $request->input('search');
             $sortBy = $request->input('sort_by', 'p.id'); // default sort by id
-            $sortOrder = $request->input('sort_order', 'asc'); // default ascending
-            $perPage = $request->input('per_page', 10); // default 10 items per page
+            $sortOrder = strtolower($request->input('sort_order', 'asc')) === 'desc' ? 'desc' : 'asc'; // default asc
+            $perPage = (int) $request->input('per_page', 10); // default 10 items per page
 
             // Base query
             $query = DB::table('products as p')
@@ -25,11 +25,7 @@ class ProductController extends Controller
                     'p.nama_barang',
                     'p.sku',
                     'p.lokasi_rak',
-                    'p.stok as stok_awal',
-                    DB::raw('SUM(CASE WHEN t.jenis_transaksi = "Masuk" THEN t.jumlah ELSE 0 END) as total_masuk'),
-                    DB::raw('SUM(CASE WHEN t.jenis_transaksi = "Keluar" THEN t.jumlah ELSE 0 END) as total_keluar'),
-                    DB::raw('p.stok + SUM(CASE WHEN t.jenis_transaksi = "Masuk" THEN t.jumlah ELSE 0 END) 
-                    - SUM(CASE WHEN t.jenis_transaksi = "Keluar" THEN t.jumlah ELSE 0 END) as total')
+                    'p.stok'
                 )
                 ->groupBy('p.id', 'p.nama_barang', 'p.sku', 'p.lokasi_rak', 'p.stok');
 
@@ -43,12 +39,11 @@ class ProductController extends Controller
             }
 
             // Apply sorting (validate allowed fields to prevent SQL injection)
-            $allowedSorts = ['p.id', 'p.nama_barang', 'p.sku', 'p.lokasi_rak', 'total', 'total_masuk', 'total_keluar'];
-            if (in_array($sortBy, $allowedSorts)) {
-                $query->orderBy($sortBy, $sortOrder);
-            } else {
-                $query->orderBy('p.id', 'asc'); // fallback
+            $allowedSorts = ['p.id', 'p.nama_barang', 'p.sku', 'p.lokasi_rak', 'p.stok'];
+            if (!in_array($sortBy, $allowedSorts)) {
+                $sortBy = 'p.id'; // fallback
             }
+            $query->orderBy($sortBy, $sortOrder);
 
             // Pagination
             $result = $query->paginate($perPage);
@@ -66,7 +61,6 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
 
     public function create(Request $request)
     {

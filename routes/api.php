@@ -37,3 +37,4 @@ Route::group(['prefix' => 'users'], function () {
 });
 
 Route::get('chartData', [TransactionController::class, 'chartData'])->name('chartData');
+Route::get('/chart/stok-pie', [TransactionController::class, 'stokPieChart'])->name('stokPieChart');

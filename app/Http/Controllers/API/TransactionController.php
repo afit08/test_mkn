@@ -86,26 +86,62 @@ class TransactionController extends Controller
     {
         $request->validate([
             'barang_id' => 'required|string',
-            'jenis_transaksi' => 'required|string',
-            'jumlah' => 'required|integer',
+            'jenis_transaksi' => 'required|string|in:masuk,keluar',
+            'jumlah' => 'required|integer|min:1',
             'tanggal_transaksi' => 'required|string',
         ]);
 
         try {
-            $result = DB::table('transactions')->insert([
-                'barang_id' => $request->input('barang_id'),
-                'jenis_transaksi' => $request->input('jenis_transaksi'),
-                'jumlah' => $request->input('jumlah'),
-                'tanggal_transaksi' => $request->input('tanggal_transaksi'),
-                'keterangan' => $request->input('keterangan'),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Ambil data barang
+            $barang = DB::table('products')->where('id', $request->input('barang_id'))->first();
+
+            if (!$barang) {
+                return response()->json([
+                    'message' => 'Barang tidak ditemukan.',
+                    'status' => false,
+                    'data' => null
+                ], 404);
+            }
+
+            // Validasi stok jika transaksi keluar
+            if ($request->input('jenis_transaksi') === 'keluar' && $request->input('jumlah') > $barang->stok) {
+                return response()->json([
+                    'message' => 'Stok tidak mencukupi. Transaksi dibatalkan.',
+                    'status' => false,
+                    'data' => null
+                ], 400);
+            }
+
+            // Gunakan transaction agar atomic
+            DB::transaction(function () use ($request, $barang) {
+                // Insert transaksi
+                DB::table('transactions')->insert([
+                    'barang_id' => $request->input('barang_id'),
+                    'jenis_transaksi' => $request->input('jenis_transaksi'),
+                    'jumlah' => $request->input('jumlah'),
+                    'tanggal_transaksi' => $request->input('tanggal_transaksi'),
+                    'keterangan' => $request->input('keterangan'),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Update stok
+                $newStok = $barang->stok;
+                if ($request->input('jenis_transaksi') === 'masuk') {
+                    $newStok += $request->input('jumlah');
+                } else { // masuk
+                    $newStok -= $request->input('jumlah');
+                }
+
+                DB::table('products')->where('id', $barang->id)->update([
+                    'stok' => $newStok
+                ]);
+            });
 
             return response()->json([
-                'message' => 'Create transactions successfully!',
+                'message' => 'Create transaction successfully!',
                 'status' => true,
-                'data' => $result // returns true/false
+                'data' => null
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -218,5 +254,50 @@ class TransactionController extends Controller
                 ],
             ],
         ]);
+    }
+
+    public function stokPieChart()
+    {
+        try {
+            // Ambil total stok per barang
+            $data = DB::table('products')
+                ->select('nama_barang', 'stok')
+                ->where('stok', '>', 0)
+                ->get();
+
+            // Format data untuk pie chart
+            $chartData = [
+                'labels' => $data->pluck('nama_barang'),
+                'datasets' => [
+                    [
+                        'label' => 'Stok Barang',
+                        'data' => $data->pluck('stok'),
+                        'backgroundColor' => [
+                            '#FF6384',
+                            '#36A2EB',
+                            '#FFCE56',
+                            '#4BC0C0',
+                            '#9966FF',
+                            '#FF9F40',
+                            '#C9CBCF',
+                            '#FF6384',
+                            '#36A2EB'
+                        ]
+                    ]
+                ]
+            ];
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Pie chart data fetched successfully',
+                'data' => $chartData
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Internal server error',
+                'data' => $th->getMessage()
+            ], 500);
+        }
     }
 }
