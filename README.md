@@ -14,27 +14,25 @@ This is a Laravel application configured to run using Composer scripts. It inclu
 
 ## Installation
 
-1. **Clone the repository**
-
 ```bash
-git clone <repository-url>
-cd <project-folder>
+# Clone the repository
+git clone https://github.com/afit08/test_mkn.git
+cd test_mkn
 
+# Install PHP dependencies
 composer install
 
+# Copy and configure environment file
 cp .env.example .env
 
+# Generate application key
 php artisan key:generate
 
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=your_database
-DB_USERNAME=your_user
-DB_PASSWORD=your_password
-
+# Run database migrations
 php artisan migrate
 
+# Install frontend dependencies
 npm install
 
+# Run laravel
 composer run dev
